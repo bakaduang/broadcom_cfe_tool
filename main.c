@@ -5,13 +5,14 @@ struct arg_str *embed_nvram_offset, *embed_nvram_size;
 struct arg_file *input_file_path, *output_file_path;
 struct arg_end *end;
 
-static int cfe_fopen(FILE **stream, const char *filename, const char *mode) {
+static int cfe_fopen_failed(FILE **stream, const char *filename, const char *mode) {
     *stream = fopen(filename, mode);
     return *stream == NULL;
 }
 
 static size_t cfe_fread_s(void *buffer, size_t buffer_size, size_t element_size, size_t element_count, FILE *stream) {
-    if (element_size != 0 && element_count > buffer_size / element_size) {
+    if (element_size != 0 &&
+        (element_count > buffer_size / element_size || element_count * element_size > buffer_size)) {
         return 0;
     }
     return fread(buffer, element_size, element_count, stream);
@@ -93,7 +94,7 @@ void explain_lzma_err(int ret) {
 int
 compress_to_cfe(const char *nvram_text_file_path, const char *cfe_file_path, long output_offset, size_t output_size) {
     FILE * fp_input;
-    int fopen_s_err_ret = cfe_fopen(&fp_input, nvram_text_file_path, "rb");
+    int fopen_s_err_ret = cfe_fopen_failed(&fp_input, nvram_text_file_path, "rb");
     if (fopen_s_err_ret != 0) {
         perror("Error while opening the input file.\n");
         exit(EXIT_FAILURE);
@@ -206,7 +207,7 @@ compress_to_cfe(const char *nvram_text_file_path, const char *cfe_file_path, lon
     }
 
     FILE * fp_output = NULL;
-    fopen_s_err_ret = cfe_fopen(&fp_output, cfe_file_path, "r+b");
+    fopen_s_err_ret = cfe_fopen_failed(&fp_output, cfe_file_path, "r+b");
     if (fopen_s_err_ret != 0 || fp_output == NULL) {
         perror("Error while opening the output file.\n");
         exit(EXIT_FAILURE);
@@ -228,7 +229,7 @@ decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_path,
                     size_t read_bytes_count,
                     size_t nvram_partition_size) {
     FILE * fp_input;
-    int fopen_s_err_ret = cfe_fopen(&fp_input, cfe_file_path, "rb");
+    int fopen_s_err_ret = cfe_fopen_failed(&fp_input, cfe_file_path, "rb");
     if (fopen_s_err_ret != 0) {
         perror("Error while opening the input file.\n");
         exit(EXIT_FAILURE);
@@ -298,7 +299,7 @@ decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_path,
     }
 
     FILE * fp_output = NULL;
-    fopen_s_err_ret = cfe_fopen(&fp_output, nvram_text_file_path, "wb");
+    fopen_s_err_ret = cfe_fopen_failed(&fp_output, nvram_text_file_path, "wb");
     if (fopen_s_err_ret != 0 || fp_output == NULL) {
         perror("Error while opening the output file.\n");
         exit(EXIT_FAILURE);
@@ -333,7 +334,7 @@ int decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_p
                         size_t read_bytes_count) {
 
     FILE * fp_input;
-    int fopen_s_err_ret = cfe_fopen(&fp_input, cfe_file_path, "rb");
+    int fopen_s_err_ret = cfe_fopen_failed(&fp_input, cfe_file_path, "rb");
     if (fopen_s_err_ret != 0) {
         perror("Error while opening the input file.\n");
         exit(EXIT_FAILURE);
@@ -419,7 +420,7 @@ int decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_p
     }
 
     FILE * fp_output = NULL;
-    fopen_s_err_ret = cfe_fopen(&fp_output, nvram_text_file_path, "wb");
+    fopen_s_err_ret = cfe_fopen_failed(&fp_output, nvram_text_file_path, "wb");
     if (fopen_s_err_ret != 0 || fp_output == NULL) {
         perror("Error while opening the output file.\n");
         exit(EXIT_FAILURE);
