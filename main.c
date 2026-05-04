@@ -1,4 +1,5 @@
 #include "main.h"
+#include <errno.h>
 
 struct arg_lit *compress, *decompress, *help, *version;
 struct arg_str *embed_nvram_offset, *embed_nvram_size;
@@ -6,8 +7,9 @@ struct arg_file *input_file_path, *output_file_path;
 struct arg_end *end;
 
 static int cfe_fopen_wrapper(FILE **stream, const char *filename, const char *mode) {
+    errno = 0;
     *stream = fopen(filename, mode);
-    return *stream == NULL;
+    return *stream == NULL ? (errno != 0 ? errno : 1) : 0;
 }
 
 static size_t cfe_fread_s(void *buffer, size_t buffer_size, size_t element_size, size_t element_count, FILE *stream) {
@@ -43,12 +45,13 @@ const char *get_nvram_value(const char *nvram, size_t nvram_size, char *name) {
         const char *nvram_section = &nvram[kv_loc];
         kv_len = strnlen(nvram_section, nvram_size - kv_loc);
         if (kv_len > 0) {
-            if (kv_len + 1 > READ_BUFFER_SIZE) {
+            if (kv_len >= nvram_size - kv_loc || kv_len >= READ_BUFFER_SIZE) {
                 fprintf(stderr, "Please increase the size of buff in get_nvram_value.\n");
                 return NULL;
             }
             memset(buff, 0, READ_BUFFER_SIZE);
-            memcpy(buff, nvram_section, kv_len + 1);
+            memcpy(buff, nvram_section, kv_len);
+            buff[kv_len] = '\0';
             size_t buff_len = strnlen(buff, READ_BUFFER_SIZE);
             char *v4 = strchr(buff, 61); // ASC('=') == 61
             if (v4 != NULL && (size_t) (v4 - buff) < buff_len - 1) {
