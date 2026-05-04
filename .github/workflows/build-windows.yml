@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@v4
         with:
           update: true
           install: >-
@@ -32,7 +32,7 @@ jobs:
         shell: msys2 {0}
 
       - name: Upload binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: broadcom_cfe_tool_binary
           path: ./broadcom_cfe_tool.exe
