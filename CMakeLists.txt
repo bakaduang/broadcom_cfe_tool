@@ -9,3 +9,6 @@ add_subdirectory(argtable)
 
 add_executable(broadcom_cfe_tool main.c)
 target_link_libraries(broadcom_cfe_tool lzma argtable)
+if (NOT MSVC)
+    target_link_libraries(broadcom_cfe_tool m)
+endif()

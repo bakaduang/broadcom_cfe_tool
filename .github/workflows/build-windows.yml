@@ -22,17 +22,20 @@ jobs:
         with:
           update: true
           install: >-
+            mingw-w64-x86_64-cmake
             mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-ninja
         env:
           MSYSTEM: MINGW64
 
       - name: Compile broadcom_cfe_tool
-        # Manually specify the exact command to compile without using any configure or makefile
-        run: gcc -o broadcom_cfe_tool.exe *.c
+        run: |
+          cmake -S . -B build -G Ninja
+          cmake --build build
         shell: msys2 {0}
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: broadcom_cfe_tool_binary
-          path: ./broadcom_cfe_tool.exe
+          path: ./build/broadcom_cfe_tool.exe
