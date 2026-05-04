@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main  # Adjust if necessary
+  workflow_dispatch:
 
 jobs:
   build-windows:
