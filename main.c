@@ -5,6 +5,18 @@ struct arg_str *embed_nvram_offset, *embed_nvram_size;
 struct arg_file *input_file_path, *output_file_path;
 struct arg_end *end;
 
+static int cfe_fopen(FILE **stream, const char *filename, const char *mode) {
+    *stream = fopen(filename, mode);
+    return *stream == NULL;
+}
+
+static size_t cfe_fread_s(void *buffer, size_t buffer_size, size_t element_size, size_t element_count, FILE *stream) {
+    if (element_size != 0 && element_count > buffer_size / element_size) {
+        return 0;
+    }
+    return fread(buffer, element_size, element_count, stream);
+}
+
 unsigned char
 hndcrc8(
         const unsigned char *pdata,    /* pointer to array of data to process */
@@ -36,10 +48,7 @@ const char *get_nvram_value(const char *nvram, size_t nvram_size, char *name) {
                 return NULL;
             }
             memset(buff, 0, READ_BUFFER_SIZE);
-            if (strcpy_s(buff, READ_BUFFER_SIZE, nvram_section) != 0) {
-                perror("Error while strcpy from nvram to buff in get_nvram_value.\n");
-                exit(EXIT_FAILURE);
-            }
+            memcpy(buff, nvram_section, kv_len + 1);
             size_t buff_len = strnlen(buff, READ_BUFFER_SIZE);
             char *v4 = strchr(buff, 61); // ASC('=') == 61
             if (v4 != NULL && (size_t) (v4 - buff) < buff_len - 1) {
@@ -63,19 +72,19 @@ void explain_lzma_err(int ret) {
     char err_msg[ERR_MSG_LEN] = {0};
     switch (ret) {
         case SZ_ERROR_DATA:
-            sprintf_s(err_msg, ERR_MSG_LEN, "Lzma: Data error.");
+            snprintf(err_msg, ERR_MSG_LEN, "Lzma: Data error.");
             break;
         case SZ_ERROR_MEM:
-            sprintf_s(err_msg, ERR_MSG_LEN, "Lzma: Memory allocation error.");
+            snprintf(err_msg, ERR_MSG_LEN, "Lzma: Memory allocation error.");
             break;
         case SZ_ERROR_UNSUPPORTED:
-            sprintf_s(err_msg, ERR_MSG_LEN, "Lzma: Unsupported properties.");
+            snprintf(err_msg, ERR_MSG_LEN, "Lzma: Unsupported properties.");
             break;
         case SZ_ERROR_INPUT_EOF:
-            sprintf_s(err_msg, ERR_MSG_LEN, "Lzma: It needs more bytes in input buffer (src).");
+            snprintf(err_msg, ERR_MSG_LEN, "Lzma: It needs more bytes in input buffer (src).");
             break;
         default:
-            sprintf_s(err_msg, ERR_MSG_LEN, "Lzma: Error code %d.", ret);
+            snprintf(err_msg, ERR_MSG_LEN, "Lzma: Error code %d.", ret);
             break;
     }
     fprintf(stderr, "%s\n", err_msg);
@@ -84,7 +93,7 @@ void explain_lzma_err(int ret) {
 int
 compress_to_cfe(const char *nvram_text_file_path, const char *cfe_file_path, long output_offset, size_t output_size) {
     FILE * fp_input;
-    errno_t fopen_s_err_ret = fopen_s(&fp_input, nvram_text_file_path, "rb");
+    int fopen_s_err_ret = cfe_fopen(&fp_input, nvram_text_file_path, "rb");
     if (fopen_s_err_ret != 0) {
         perror("Error while opening the input file.\n");
         exit(EXIT_FAILURE);
@@ -197,7 +206,7 @@ compress_to_cfe(const char *nvram_text_file_path, const char *cfe_file_path, lon
     }
 
     FILE * fp_output = NULL;
-    fopen_s_err_ret = fopen_s(&fp_output, cfe_file_path, "r+b");
+    fopen_s_err_ret = cfe_fopen(&fp_output, cfe_file_path, "r+b");
     if (fopen_s_err_ret != 0 || fp_output == NULL) {
         perror("Error while opening the output file.\n");
         exit(EXIT_FAILURE);
@@ -219,7 +228,7 @@ decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_path,
                     size_t read_bytes_count,
                     size_t nvram_partition_size) {
     FILE * fp_input;
-    errno_t fopen_s_err_ret = fopen_s(&fp_input, cfe_file_path, "rb");
+    int fopen_s_err_ret = cfe_fopen(&fp_input, cfe_file_path, "rb");
     if (fopen_s_err_ret != 0) {
         perror("Error while opening the input file.\n");
         exit(EXIT_FAILURE);
@@ -248,8 +257,8 @@ decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_path,
     }
     memset(embed_nvram_compressed, 0, embed_nvram_compressed_size);
 
-    size_t num_read = fread_s(embed_nvram_compressed, embed_nvram_compressed_size, sizeof(char), read_bytes_count,
-                              fp_input);
+    size_t num_read = cfe_fread_s(embed_nvram_compressed, embed_nvram_compressed_size, sizeof(char), read_bytes_count,
+                                  fp_input);
     if (num_read != read_bytes_count) {
         fprintf(stderr, "Expected reading size is %zu, but the actual number of reads is %zu.\n", read_bytes_count,
                 num_read);
@@ -289,7 +298,7 @@ decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_path,
     }
 
     FILE * fp_output = NULL;
-    fopen_s_err_ret = fopen_s(&fp_output, nvram_text_file_path, "wb");
+    fopen_s_err_ret = cfe_fopen(&fp_output, nvram_text_file_path, "wb");
     if (fopen_s_err_ret != 0 || fp_output == NULL) {
         perror("Error while opening the output file.\n");
         exit(EXIT_FAILURE);
@@ -324,7 +333,7 @@ int decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_p
                         size_t read_bytes_count) {
 
     FILE * fp_input;
-    errno_t fopen_s_err_ret = fopen_s(&fp_input, cfe_file_path, "rb");
+    int fopen_s_err_ret = cfe_fopen(&fp_input, cfe_file_path, "rb");
     if (fopen_s_err_ret != 0) {
         perror("Error while opening the input file.\n");
         exit(EXIT_FAILURE);
@@ -353,8 +362,8 @@ int decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_p
     }
     memset(embed_nvram_compressed, 0, embed_nvram_compressed_size);
 
-    size_t num_read = fread_s(embed_nvram_compressed, embed_nvram_compressed_size, sizeof(char), read_bytes_count,
-                              fp_input);
+    size_t num_read = cfe_fread_s(embed_nvram_compressed, embed_nvram_compressed_size, sizeof(char), read_bytes_count,
+                                  fp_input);
     if (num_read != read_bytes_count) {
         fprintf(stderr, "Expected reading size is %zu, but the actual number of reads is %zu.\n", read_bytes_count,
                 num_read);
@@ -410,7 +419,7 @@ int decompress_from_cfe(const char *cfe_file_path, const char *nvram_text_file_p
     }
 
     FILE * fp_output = NULL;
-    fopen_s_err_ret = fopen_s(&fp_output, nvram_text_file_path, "wb");
+    fopen_s_err_ret = cfe_fopen(&fp_output, nvram_text_file_path, "wb");
     if (fopen_s_err_ret != 0 || fp_output == NULL) {
         perror("Error while opening the output file.\n");
         exit(EXIT_FAILURE);
